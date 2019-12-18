@@ -200,3 +200,4 @@ class VGG16(nn.Module):
 
         out = F.log_softmax(out, dim=1)
         return out
+

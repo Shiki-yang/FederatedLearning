@@ -22,9 +22,6 @@ class CNNMnist(nn.Module):
         return F.log_softmax(x, dim=1)
 
 
-
-
-
 class CNNCifar(nn.Module):
     def __init__(self, args):
         super(CNNCifar, self).__init__()
@@ -112,8 +109,6 @@ class CNNCifar(nn.Module):
         return x
 
 class VGG16(nn.Module):
-
-
     def __init__(self):
         super(VGG16, self).__init__()
 

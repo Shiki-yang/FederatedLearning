@@ -8,12 +8,14 @@ import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
 
 import socket
+import json
 #设置device 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
 #准备数据集cifar10
 print('now, we are gonging to prepare for the data')
+
 transform_train = transforms.Compose([
     transforms.RandomCrop(32, padding=4),
     transforms.RandomHorizontalFlip(),
@@ -190,12 +192,17 @@ for epoch in range(2):
         loss_epoch = run_loss /(batch_index + 1)
     print('')
 
+# print(list(net.named_parameters()))
+print(type(list(net.named_parameters())))
+'''
 client = socket.socket(socket.AF_INET,socket.SOCK_STREAM) #声明socket类型，同时生成链接对象
 client.connect(('localhost',6999)) #建立一个链接，连接到本地的6969端口
 
 print('begin send')
-client.send(net.named_parameters().encode('utf-8'))  #发送一条信息 python3 只接收btye流
+client.send(json.dumps(list(net.named_parameters())).encode('utf-8'))  #发送一条信息 python3 只接收btye流
 print('end send')
 client.close() #关闭这个链接
+'''
+
 
     

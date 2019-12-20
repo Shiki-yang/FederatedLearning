@@ -6,6 +6,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
+import numpy
 
 import socket
 import json
@@ -170,7 +171,7 @@ criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr = 0.1, momentum=0.9, weight_decay=5e-4)
 
 
-for epoch in range(2):
+for epoch in range(1):
 #train:
     print('\nEpoch: %d' % epoch)
     net.train()
@@ -193,16 +194,23 @@ for epoch in range(2):
     print('')
 
 # print(list(net.named_parameters()))
-print(type(list(net.named_parameters())))
-'''
+# print(type(list(net.named_parameters())))
+dict = {}
+for name, param in net.named_parameters():
+	dict[name]  =  param.cpu().detach().numpy().tolist()
+	# print(name, param.cpu().detach().numpy().tolist(),type(param.cpu().detach().numpy().tolist()))
+
+#  dict['test']=['1','2']
+
+# print(dict)
+
 client = socket.socket(socket.AF_INET,socket.SOCK_STREAM) #声明socket类型，同时生成链接对象
-client.connect(('localhost',6999)) #建立一个链接，连接到本地的6969端口
+client.connect(('localhost',6999)) #建立一个链接，连接到本地的6999端口
 
 print('begin send')
-client.send(json.dumps(list(net.named_parameters())).encode('utf-8'))  #发送一条信息 python3 只接收btye流
+#client.send(json.dumps(dict).encode('utf-8'))  #发送一条信息 python3 只接收btye流
+for name, param in net.named_parameters():
+	dict[name] = param.cpu().detach().numpy().tolist()
+	client.send(json.dumps())
 print('end send')
 client.close() #关闭这个链接
-'''
-
-
-    

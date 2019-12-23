@@ -197,11 +197,8 @@ for epoch in range(1):
 # print(type(list(net.named_parameters())))
 dict = {}
 for name, param in net.named_parameters():
-	dict[name]  =  param.cpu().detach().numpy().tolist()
-	# print(name, param.cpu().detach().numpy().tolist(),type(param.cpu().detach().numpy().tolist()))
-
-#  dict['test']=['1','2']
-
+    dict[name]  =  param.cpu().detach().numpy().tolist()
+# print(name, param.cpu().detach().numpy().tolist(),type(param.cpu().detach().numpy().tolist()))
 # print(dict)
 
 client = socket.socket(socket.AF_INET,socket.SOCK_STREAM) #声明socket类型，同时生成链接对象
@@ -209,8 +206,12 @@ client.connect(('localhost',6999)) #建立一个链接，连接到本地的6999�
 
 print('begin send')
 #client.send(json.dumps(dict).encode('utf-8'))  #发送一条信息 python3 只接收btye流
-for name, param in net.named_parameters():
-	dict[name] = param.cpu().detach().numpy().tolist()
-	client.send(json.dumps())
-print('end send')
+'''
+for key, value in dict.items():
+    # print({key: value})
+    client.sendall(json.dumps({key: value}).encode('utf-8'))
+'''
+client.sendall(json.dumps(dict).encode('utf-8'))
+print('end')
+# client.sendall('end'.encode('utf-8'))
 client.close() #关闭这个链接

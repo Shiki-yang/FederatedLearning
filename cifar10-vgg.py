@@ -7,36 +7,45 @@ import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
 import numpy
-
 import socket
 import json
+import time
+
 #设置device 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
+trained_paramdict = {} # 训练参数:dict
+received_paramdict  = {} # 接受参数:dict
 
-#准备数据集cifar10
-print('now, we are gonging to prepare for the data')
+classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
-transform_train = transforms.Compose([
+# root  = /datapool/workspace/jiangshanyang/Federated-Learning-PyTorch/data/cifar/
+def cifar10_prepare(root):
+    '''
+    处理cifar10数据集
+    :param root: 路径
+    :return: trainloader
+    '''
+    print('now, we are gonging to prepare for the data')
+    transform_train = transforms.Compose([
     transforms.RandomCrop(32, padding=4),
     transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-])
+    ])
 
-transform_test = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-])
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    ])
 
-trainset = torchvision.datasets.CIFAR10(root='/datapool/workspace/jiangshanyang/Federated-Learning-PyTorch/data/cifar/',  train = True, download = False, transform = transform_train)
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=4)
-
-testset = torchvision.datasets.CIFAR10(root='/datapool/workspace/jiangshanyang/Federated-Learning-PyTorch/data/cifar/', train=False, download=False, transform=transform_test)
-testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=4)
-
-classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
-
+    trainset = torchvision.datasets.CIFAR10(root, train= True, download= False, transform= transform_train)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=4)
+    '''
+    testset = torchvision.datasets.CIFAR10(root, train=False, download=False, transform=transform_test)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=4)
+    '''
+    return trainloader
 
 #vgg16模型定义
 class VGG16(nn.Module):
@@ -145,73 +154,60 @@ class CNNCifar(nn.Module):
         x = self.fc3(x)
         return F.log_softmax(x, dim=1)
 
-
-print('the data is prepared, then we will train the network')
-#net = VGG16()
-net  =  CNNCifar()
-net = net.to(device)
-print(net)
-'''
-CNNCifar(
-  (conv1): Conv2d(3, 6, kernel_size=(5, 5), stride=(1, 1))
-  (pool): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
-  (conv2): Conv2d(6, 16, kernel_size=(5, 5), stride=(1, 1))
-  (fc1): Linear(in_features=400, out_features=120, bias=True)
-  (fc2): Linear(in_features=120, out_features=84, bias=True)
-  (fc3): Linear(in_features=84, out_features=10, bias=True)
-)
-
-'''
-if device == 'cuda':
-    net = torch.nn.DataParallel(net)
-    cudnn.benchmark = True
-
-
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(net.parameters(), lr = 0.1, momentum=0.9, weight_decay=5e-4)
-
-
-for epoch in range(1):
-#train:
-    print('\nEpoch: %d' % epoch)
-    net.train()
-    epoch_total = 0
-    run_loss = 0
-    run_correct = 0
-
-    for batch_index, data in enumerate(trainloader):
-        inputs, labels = data
-        inputs, labels = inputs.to(device), labels.to(device)
-
-        optimizer.zero_grad()
-        outputs = net(inputs)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
-
-        run_loss += loss.item()
-        loss_epoch = run_loss /(batch_index + 1)
-    print('')
-
-# print(list(net.named_parameters()))
-# print(type(list(net.named_parameters())))
-dict = {}
-for name, param in net.named_parameters():
-    dict[name]  =  param.cpu().detach().numpy().tolist()
 # print(name, param.cpu().detach().numpy().tolist(),type(param.cpu().detach().numpy().tolist()))
 # print(dict)
-
+'''
 client = socket.socket(socket.AF_INET,socket.SOCK_STREAM) #声明socket类型，同时生成链接对象
 client.connect(('localhost',6999)) #建立一个链接，连接到本地的6999端口
 
 print('begin send')
 #client.send(json.dumps(dict).encode('utf-8'))  #发送一条信息 python3 只接收btye流
-'''
-for key, value in dict.items():
-    # print({key: value})
-    client.sendall(json.dumps({key: value}).encode('utf-8'))
-'''
+
 client.sendall(json.dumps(dict).encode('utf-8'))
 print('end')
 # client.sendall('end'.encode('utf-8'))
 client.close() #关闭这个链接
+'''
+
+if __name__ == '__main__':
+    #  建立client socket，连接server
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.connect(('localhost', 6999))
+
+    # 训练网络，获得网络参数字典
+    # 准备数据集
+    trainloader = cifar10_prepare('/datapool/workspace/jiangshanyang/Federated-Learning-PyTorch/data/cifar/')
+    print('next training...')
+    net = CNNCifar()
+    net = net.to(device)
+    print(net)
+    if device == 'cuda':
+        net = torch.nn.DataParallel(net)
+        cudnn.benchmark = True
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(net.parameters(), lr = 0.1, momentum=0.9, weight_decay=5e-4)
+    for epoch in range(1):
+    #train:
+        print('\nEpoch: %d' % epoch)
+        net.train()
+        for batch_index, data in enumerate(trainloader):
+            inputs, labels = data
+            inputs, labels = inputs.to(device), labels.to(device)
+
+            optimizer.zero_grad()
+            outputs = net(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+        print('')
+    for name, param in net.named_parameters():
+        trained_paramdict[name]  =  param.cpu().detach().numpy().tolist()
+    # 将网络参数字典发送至server
+    client.sendall(json.dumps(trained_paramdict).encode('utf-8'))
+    # 等待接受新的参数（client发送-server接受-server聚合-server发送-client接受）
+    time.sleep(5)
+    received_paramdict = client.recv(1024, socket.MSG_WAITALL).decode()
+    print('receive param:', received_paramdict)
+    # 更新参数，重新训练网络
+
+

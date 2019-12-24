@@ -24,7 +24,7 @@ def initial_server():
     '''
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind(('localhost', 6999))
-    server.listen(2)
+    server.listen(5)
     print('listening')
     return server
 
@@ -36,7 +36,6 @@ def param_rec(conn, address):
     :return: 返回client参数字典：dict
     '''
     print('handle:', address)
-    linking_client.append((conn, address))
     data = conn.recv(1024, socket.MSG_WAITALL).decode()
     total_data = data
     num =  len(data)
@@ -50,7 +49,7 @@ def param_rec(conn, address):
     # print('num:', num)
     # conn.close()
     received_param.append(json.loads(total_data))
-    return json.loads(total_data)
+    linking_client.append((conn, address))
 
 def param_merge(nets):
     """
@@ -64,17 +63,6 @@ def param_merge(nets):
         net[key] = net[key].tolist()
     return net
 
-def load_net(file_name):
-    '''
-    :param file_name: 文件名
-    :return: 网络参数:dict
-    '''
-    file = open(file_name, 'r')
-    js = file.read()
-    dic = json.loads(js)
-    file.close()
-    return dic
-
 def param_send(client, data):
     '''
     参数发送
@@ -85,30 +73,31 @@ def param_send(client, data):
     client[0].sendall(json.dumps(data).encode('utf-8'))
 
 '''
-if __name__ == '__main__':
-    server = initial_server()
-    while True:
-        if len(linking_client) < max_worker:
-            conn, address = server.accept()  # 等待连接，此处自动阻塞
-            t = threading.Thread(target=param_rec, args=(conn, address))
-            t.start()
-        # len(linking_client) = max_worker = 2 : 执行参数聚合
-        global_param = param_merge(received_param)
-        # 参数聚合完成之后，将参数发送到client(conn, address)中
-        for i in range(max_worker):
-            param_send(linking_client[i], global_param)
-        # 清空连接列表和接受参数列表
-        linking_client.clear()
-        received_param.clear()
+conn, address = server.accept()
+link_handler(conn, address)
 '''
 
 if __name__ == '__main__':
     server = initial_server()
-    while True:
-        conn, addr = server.accept()
-        param_rec(conn=conn, address=addr)
+    while True:     # 一个死循环，不断的接受客户端发来的连接请求
+
+        conn, address = server.accept()  # 等待连接，此处自动阻塞
+        # 每当有新的连接过来，自动创建一个新的线程，
+        # 并将连接对象和访问者的ip信息作为参数传递给线程的执行函数
+        t = threading.Thread(target=param_rec, args=(conn, address))
+        t.start()
+        print(linking_client)
+        '''
+        if len(linking_client) < max_worker: #max_worker = 2
+            conn, address = server.accept()
+            linking_client.append((conn, address))
+            data = param_rec(conn=conn, address=address)
+            received_param.append(data)
+        # len(linking_client) = max_worker = 2 : 执行参数聚合
         global_param = param_merge(received_param)
-        for i in range(len(linking_client)):
+        # 参数聚合完成之后，将参数发送到client(conn, address)中
+        for i in  range(max_worker):
             param_send(linking_client[i], global_param)
+        '''
 
 

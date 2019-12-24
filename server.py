@@ -42,12 +42,12 @@ def param_rec(conn, address):
     num =  len(data)
     while len(data)>0:
         data = conn.recv(1024, socket.MSG_WAITALL).decode()
-        print('len:', len(data))
+        # print('len:', len(data))
         total_data += data
         num += len(data)
     # print('total_data:', total_data)
     # print('type:', type(json.loads(total_data)))
-    # print('num:', num)
+    print('num:', num)
     # conn.close()
     received_param.append(json.loads(total_data))
     return json.loads(total_data)
@@ -75,14 +75,14 @@ def load_net(file_name):
     file.close()
     return dic
 
-def param_send(client, data):
+def param_send(conn, data):
     '''
     参数发送
     :param client:
     :param data:
     :return:
     '''
-    client[0].sendall(json.dumps(data).encode('utf-8'))
+    conn.sendall(json.dumps(data).encode('utf-8'))
 
 '''
 if __name__ == '__main__':
@@ -103,12 +103,35 @@ if __name__ == '__main__':
 '''
 
 if __name__ == '__main__':
+    # step.3-初始化server 并监听端口6999
     server = initial_server()
-    while True:
-        conn, addr = server.accept()
-        param_rec(conn=conn, address=addr)
-        global_param = param_merge(received_param)
-        for i in range(len(linking_client)):
-            param_send(linking_client[i], global_param)
+    conn, addr = server.accept()
 
+    # step.4-接受来自client的参数
+    print('handle:', addr)
+    linking_client.append((conn, addr))
+    data = conn.recv(1024, socket.MSG_WAITALL).decode()
+    total_data = data
+    num = len(data)
+    while len(data) > 0:
+        data = conn.recv(1024, socket.MSG_WAITALL).decode()
+        total_data += data
+        num += len(data)
+    print('num:', num)
+    received_param.append(json.loads(total_data))
+
+    print(len(linking_client))  # 输出连接链表元素数量
+    print(len(received_param))  # 输出接受参数字典列表元素数量
+
+    # step.5-聚合参数，读入两个参数，模拟多client
+    net1 = load_net("param1.md")
+    net2 = load_net("param2.md")
+    received_param.append(net1)
+    received_param.append(net2)
+    print(len(received_param))
+    global_param = param_merge(received_param)
+    print(global_param.keys())
+
+    # step.6-发送global param
+    conn.sendall(json.dumps(global_param).encode('utf-8'))
 

@@ -14,8 +14,8 @@ import time
 #设置device 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-trained_paramdict = {} # 训练参数:dict
-received_paramdict  = {} # 接受参数:dict
+trained_param = {} # 训练参数:dict
+received_param  = {} # 接受参数:dict
 
 classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
@@ -154,6 +154,29 @@ class CNNCifar(nn.Module):
         x = self.fc3(x)
         return F.log_softmax(x, dim=1)
 
+def param_rec(conn):
+    '''
+    服务器端接受参数
+    :param conn:
+    :param address:
+    :return: 返回client参数字典：dict
+    '''
+    print('receiving data...')
+    data = conn.recv(1024, socket.MSG_WAITALL).decode()
+    total_data = data
+    num = len(data)
+    while len(data)>0:
+        data = conn.recv(1024, socket.MSG_WAITALL).decode()
+        print('len:', len(data))
+        total_data += data
+        num += len(data)
+    # print('total_data:', total_data)
+    # print('type:', type(json.loads(total_data)))
+    # print('num:', num)
+    # conn.close()
+    return json.loads(total_data)
+
+
 # print(name, param.cpu().detach().numpy().tolist(),type(param.cpu().detach().numpy().tolist()))
 # print(dict)
 '''
@@ -170,12 +193,9 @@ client.close() #关闭这个链接
 '''
 
 if __name__ == '__main__':
-    #  建立client socket，连接server
-    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client.connect(('localhost', 6999))
 
-    # 训练网络，获得网络参数字典
-    # 准备数据集
+    # step.1-训练网络，获得网络参数字典
+    # step.1.1-准备数据集
     trainloader = cifar10_prepare('/datapool/workspace/jiangshanyang/Federated-Learning-PyTorch/data/cifar/')
     print('next training...')
     net = CNNCifar()
@@ -186,9 +206,9 @@ if __name__ == '__main__':
         cudnn.benchmark = True
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(net.parameters(), lr = 0.1, momentum=0.9, weight_decay=5e-4)
+    # step.1.2-train
     for epoch in range(1):
-    #train:
-        print('\nEpoch: %d' % epoch)
+        print('begin net train...')
         net.train()
         for batch_index, data in enumerate(trainloader):
             inputs, labels = data
@@ -199,15 +219,33 @@ if __name__ == '__main__':
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
-        print('')
+        print('end net train...')
     for name, param in net.named_parameters():
-        trained_paramdict[name]  =  param.cpu().detach().numpy().tolist()
-    # 将网络参数字典发送至server
-    client.sendall(json.dumps(trained_paramdict).encode('utf-8'))
+        trained_param[name]  =  param.cpu().detach().numpy().tolist()
+
+    # step.2.1-建立client socket，连接server
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.connect(('localhost', 6999))
+
+    # step.2.2-将网络参数字典发送至server
+    print('next send all param...')
+    client.sendall(json.dumps(trained_param).encode('utf-8'))
+    print('end send')
+
+    # step.7-接受server参数
     # 等待接受新的参数（client发送-server接受-server聚合-server发送-client接受）
-    time.sleep(5)
-    received_paramdict = client.recv(1024, socket.MSG_WAITALL).decode()
-    print('receive param:', received_paramdict)
-    # 更新参数，重新训练网络
+    print('receiving data...')
+    data = client.recv(1024, socket.MSG_WAITALL).decode()
+    total_data = data
+    num = len(data)
+    while len(data) > 0:
+        data = client.recv(1024, socket.MSG_WAITALL).decode()
+        total_data += data
+        num += len(data)
+    print('num:', num)
+    received_param = json.loads(total_data)
+    print('receive param:', len(received_param))
+
+    # step.8-更新参数，重新训练网络
 
 

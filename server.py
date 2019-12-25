@@ -14,42 +14,50 @@ print('listening...')
 '''
 global_param = {} # 全局参数：dict
 received_param = [] # 已接受的参数：list
-linking_client =  [] # 已建立的连接：list
+linking_client =  [('localhost', 7000)] # 已建立的连接：list
 max_worker =  2 # client数量：int
 
-def initial_server():
+def initial_server(IP, port):
     '''
-    初始化服务器
-    :return: 返回一个socket server实例
+    初始化一个server
+    :param IP: string, 'localhost'
+    :param port: int, 6999
+    :return: 一个server对象
     '''
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind(('localhost', 6999))
+    server.bind((IP, port))
     server.listen(2)
     print('listening')
     return server
 
-def param_rec(conn, address):
+def initial_client(IP, port):
+    '''
+    初始化一个client
+    :param IP: string, 'localhost'
+    :param port: int, 6999
+    :return: 一个client对象
+    '''
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.connect((IP, port))
+    return client
+
+def param_rec(conn, addr):
     '''
     服务器端接受参数
     :param conn:
-    :param address:
+    :param addr:
     :return: 返回client参数字典：dict
     '''
-    print('handle:', address)
-    linking_client.append((conn, address))
+    print('handle:', addr)
     data = conn.recv(1024, socket.MSG_WAITALL).decode()
     total_data = data
     num =  len(data)
     while len(data)>0:
         data = conn.recv(1024, socket.MSG_WAITALL).decode()
-        # print('len:', len(data))
         total_data += data
         num += len(data)
-    # print('total_data:', total_data)
-    # print('type:', type(json.loads(total_data)))
     print('num:', num)
     # conn.close()
-    received_param.append(json.loads(total_data))
     return json.loads(total_data)
 
 def param_merge(nets):
@@ -103,35 +111,31 @@ if __name__ == '__main__':
 '''
 
 if __name__ == '__main__':
-    # step.3-初始化server 并监听端口6999
-    server = initial_server()
-    conn, addr = server.accept()
 
-    # step.4-接受来自client的参数
-    print('handle:', addr)
-    linking_client.append((conn, addr))
-    data = conn.recv(1024, socket.MSG_WAITALL).decode()
-    total_data = data
-    num = len(data)
-    while len(data) > 0:
-        data = conn.recv(1024, socket.MSG_WAITALL).decode()
-        total_data += data
-        num += len(data)
-    print('num:', num)
-    received_param.append(json.loads(total_data))
+    server = initial_server('localhost', 6999)
 
-    print(len(linking_client))  # 输出连接链表元素数量
-    print(len(received_param))  # 输出接受参数字典列表元素数量
+    while True:
+        # step.3-初始化server 并监听端口6999
+        conn, addr = server.accept()
 
-    # step.5-聚合参数，读入两个参数，模拟多client
-    net1 = load_net("param1.md")
-    net2 = load_net("param2.md")
-    received_param.append(net1)
-    received_param.append(net2)
-    print(len(received_param))
-    global_param = param_merge(received_param)
-    print(global_param.keys())
+        # step.4-接受来自client的参数
+        param = param_rec(conn,  addr)
+        conn.close()
+        received_param.append(param)
 
-    # step.6-发送global param
-    conn.sendall(json.dumps(global_param).encode('utf-8'))
+        print(len(received_param))  # 输出接受参数字典列表元素数量
 
+        # step.5-聚合参数，读入两个参数，模拟多client
+        net1 = load_net("param1.md")
+        net2 = load_net("param2.md")
+        received_param.append(net1)
+        received_param.append(net2)
+        print(len(received_param))
+        global_param = param_merge(received_param)
+        received_param.clear()
+        print(global_param.keys())
+
+        # step.6-发送global param
+        client = initial_client('localhost', 7000)
+        client.sendall(json.dumps(global_param).encode('utf-8'))
+        client.close()

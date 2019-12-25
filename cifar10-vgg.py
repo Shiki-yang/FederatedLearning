@@ -10,6 +10,7 @@ import numpy
 import socket
 import json
 import time
+import six
 
 #设置device 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -154,43 +155,61 @@ class CNNCifar(nn.Module):
         x = self.fc3(x)
         return F.log_softmax(x, dim=1)
 
-def param_rec(conn):
+def initial_server(IP, port):
+    '''
+    初始化一个server
+    :param IP: string, 'localhost'
+    :param port: int, 6999
+    :return: 一个server对象
+    '''
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind((IP, port))
+    server.listen(2)
+    print('listening')
+    return server
+
+def initial_client(IP, port):
+    '''
+    初始化一个client
+    :param IP: string, 'localhost'
+    :param port: int, 6999
+    :return: 一个client对象
+    '''
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.connect((IP, port))
+    return client
+
+def param_rec(conn, addr):
     '''
     服务器端接受参数
     :param conn:
-    :param address:
+    :param addr:
     :return: 返回client参数字典：dict
     '''
-    print('receiving data...')
+    print('handle:', addr)
     data = conn.recv(1024, socket.MSG_WAITALL).decode()
     total_data = data
     num = len(data)
     while len(data)>0:
         data = conn.recv(1024, socket.MSG_WAITALL).decode()
-        print('len:', len(data))
+        # print('len:', len(data))
         total_data += data
         num += len(data)
-    # print('total_data:', total_data)
-    # print('type:', type(json.loads(total_data)))
-    # print('num:', num)
-    # conn.close()
+    print('num:', num)
     return json.loads(total_data)
 
-
-# print(name, param.cpu().detach().numpy().tolist(),type(param.cpu().detach().numpy().tolist()))
-# print(dict)
-'''
-client = socket.socket(socket.AF_INET,socket.SOCK_STREAM) #声明socket类型，同时生成链接对象
-client.connect(('localhost',6999)) #建立一个链接，连接到本地的6999端口
-
-print('begin send')
-#client.send(json.dumps(dict).encode('utf-8'))  #发送一条信息 python3 只接收btye流
-
-client.sendall(json.dumps(dict).encode('utf-8'))
-print('end')
-# client.sendall('end'.encode('utf-8'))
-client.close() #关闭这个链接
-'''
+def param_load(net,parm):
+    '''
+    加载新参数
+    :param net:
+    :param parm:
+    :return:
+    '''
+    temp=net.state_dict()
+    for key1,key2 in six.moves.zip(temp,parm):
+        temp[key1]=torch.tensor(parm[key2])
+    net.load_state_dict(temp)
+    return net
 
 if __name__ == '__main__':
 
@@ -206,46 +225,47 @@ if __name__ == '__main__':
         cudnn.benchmark = True
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(net.parameters(), lr = 0.1, momentum=0.9, weight_decay=5e-4)
-    # step.1.2-train
-    for epoch in range(1):
+    server = initial_server('localhost', 7000)
+    # for i in range(2):
+    while True:
+        # step.1.2-train
         print('begin net train...')
-        net.train()
-        for batch_index, data in enumerate(trainloader):
-            inputs, labels = data
-            inputs, labels = inputs.to(device), labels.to(device)
+        for epoch in range(1):
+            net.train()
+            for batch_index, data in enumerate(trainloader):
+                inputs, labels = data
+                inputs, labels = inputs.to(device), labels.to(device)
 
-            optimizer.zero_grad()
-            outputs = net(inputs)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
+                optimizer.zero_grad()
+                outputs = net(inputs)
+                loss = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
         print('end net train...')
-    for name, param in net.named_parameters():
-        trained_param[name]  =  param.cpu().detach().numpy().tolist()
+        for name, param in net.named_parameters():
+            trained_param[name] = param.cpu().detach().numpy().tolist()
 
-    # step.2.1-建立client socket，连接server
-    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client.connect(('localhost', 6999))
+        # step.2.1-建立client socket，连接server
+        client = initial_client('localhost', 6999)
+        # step.2.2-将网络参数字典发送至server
+        print('next send all param...')
+        client.sendall(json.dumps(trained_param).encode('utf-8'))
+        trained_param.clear()  # 清空
+        client.close()
+        print('end send')
 
-    # step.2.2-将网络参数字典发送至server
-    print('next send all param...')
-    client.sendall(json.dumps(trained_param).encode('utf-8'))
-    print('end send')
+        # step.7-接受server参数
+        # 等待接受新的参数（client发送-server接受-server聚合-server发送-client接受）
+        # server = initial_server('localhost', 7000)
+        conn, addr = server.accept() # 阻塞
+        print('receiving data...')
+        received_param = param_rec(conn= conn, addr= addr)
+        conn.close()
+        print('receive param:', len(received_param))
 
-    # step.7-接受server参数
-    # 等待接受新的参数（client发送-server接受-server聚合-server发送-client接受）
-    print('receiving data...')
-    data = client.recv(1024, socket.MSG_WAITALL).decode()
-    total_data = data
-    num = len(data)
-    while len(data) > 0:
-        data = client.recv(1024, socket.MSG_WAITALL).decode()
-        total_data += data
-        num += len(data)
-    print('num:', num)
-    received_param = json.loads(total_data)
-    print('receive param:', len(received_param))
-
-    # step.8-更新参数，重新训练网络
+        # step.8-更新参数，重新训练网络
+        net = param_load(net, received_param)
+        received_param.clear()  # 清空
+        print(net.state_dict().keys())
 
 

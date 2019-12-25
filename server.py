@@ -62,14 +62,20 @@ def param_rec(conn, addr):
 
 def param_merge(nets):
     """
-	:param nets: client的网络参数列表。list of dictionary，维度不限，key不限，可适用于任意多个网络和任意维度的网络
-	:return: 合并后的网络参数，dictionary
-	"""
+    :param nets: client的网络参数列表。list of dictionary，维度不限，key不限，可适用于任意多个网络和任意维度的网络。
+    :return: 合并后的网络参数，dictionary
+    """
+    """
+    应对不同机器的网络参数的key 名字不同的情况：默认网络的 key不同时顺序仍然形同，可一一对应。
+    """
     net = {}
-    for key in list(nets[0].keys()):
-        net[key] = np.sum([np.array(net[key]) for net in nets], axis=0)
-        net[key] = net[key] / len(nets)
-        net[key] = net[key].tolist()
+    # for key in list(nets[0].keys()):
+    for i in range(len(nets[0].keys())):
+        keys = [list(net.keys())[i] for net in nets]
+        # net[key] = np.sum([np.array(net[key]) for net in nets], axis=0)
+        # net[key] = net[key] / len(nets)
+        net[keys[0]] = np.mean([np.array(nets[j][keys[j]]) for j in range(len(nets))], axis=0)
+        net[keys[0]] = net[keys[0]].tolist()
     return net
 
 def load_net(file_name):

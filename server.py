@@ -136,6 +136,8 @@ if __name__ == '__main__':
         print(global_param.keys())
 
         # step.6-发送global param
-        client = initial_client('localhost', 7000)
-        client.sendall(json.dumps(global_param).encode('utf-8'))
-        client.close()
+        # client = initial_client('localhost', 7000)
+        for client in linking_client:
+            conn = initial_client(client[0], client[1])
+            conn.sendall(json.dumps(global_param).encode('utf-8'))
+            conn.close()

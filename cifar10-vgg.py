@@ -216,6 +216,7 @@ if __name__ == '__main__':
     # step.1-训练网络，获得网络参数字典
     # step.1.1-准备数据集
     trainloader = cifar10_prepare('/datapool/workspace/jiangshanyang/Federated-Learning-PyTorch/data/cifar/')
+    # trainloader = cifar10_prepare('/Users/yangyangj/Documents/DataGroup/FL_project/FederatedLearning/cifar/')
     print('next training...')
     net = CNNCifar()
     net = net.to(device)
@@ -242,8 +243,9 @@ if __name__ == '__main__':
                 loss.backward()
                 optimizer.step()
         print('end net train...')
-        for name, param in net.named_parameters():
+        for name, param in net.state_dict().items():
             trained_param[name] = param.cpu().detach().numpy().tolist()
+        print(trained_param.keys())
 
         # step.2.1-建立client socket，连接server
         client = initial_client('localhost', 6999)

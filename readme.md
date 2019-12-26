@@ -1,6 +1,8 @@
 #  环境
 python3.6
+
 torch 1.3
+
 socket
 
 #  运行

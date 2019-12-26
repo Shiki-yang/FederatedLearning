@@ -17,6 +17,21 @@ received_param = [] # 已接受的参数：list
 linking_client = [('localhost', 7000), ('localhost', 7001)] # 已建立的连接：list
 max_worker = 2 # client数量：int
 
+
+
+def get_host_ip():
+    """
+    查询本机ip地址
+    :return: ip
+    """
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+    finally:
+        s.close()
+    return ip
+
 def initial_server(IP, port):
     '''
     初始化一个server

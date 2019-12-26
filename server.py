@@ -14,8 +14,8 @@ print('listening...')
 '''
 global_param = {} # 全局参数：dict
 received_param = [] # 已接受的参数：list
-linking_client =  [('localhost', 7000)] # 已建立的连接：list
-max_worker =  2 # client数量：int
+linking_client = [('localhost', 7000), ('localhost', 7001)] # 已建立的连接：list
+max_worker = 2 # client数量：int
 
 def initial_server(IP, port):
     '''
@@ -27,7 +27,7 @@ def initial_server(IP, port):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((IP, port))
     server.listen(2)
-    print('listening')
+    print('server is listening')
     return server
 
 def initial_client(IP, port):
@@ -121,13 +121,17 @@ if __name__ == '__main__':
     server = initial_server('localhost', 6999)
 
     while True:
-        # step.3-初始化server 并监听端口6999
-        conn, addr = server.accept()
+        while len(received_param) < max_worker:
+            # 根据接收到的参数字典的数量，判断是否要进行下一步的参数聚合
+            # < ：继续接受client 参数
+            # > ：退出while 循环
+        # step.3-初始化server，监听端口6999，调用accept函数，阻塞程序
+            conn, addr = server.accept()
 
         # step.4-接受来自client的参数
-        param = param_rec(conn,  addr)
-        conn.close()
-        received_param.append(param)
+            param = param_rec(conn,  addr)
+            conn.close()
+            received_param.append(param)
 
         print(len(received_param))  # 输出接受参数字典列表元素数量
 
@@ -137,9 +141,10 @@ if __name__ == '__main__':
         received_param.append(net1)
         received_param.append(net2)
         print(len(received_param))
+
         global_param = param_merge(received_param)
         received_param.clear()
-        print(global_param.keys())
+        # print(global_param.keys())
 
         # step.6-发送global param
         # client = initial_client('localhost', 7000)

@@ -12,7 +12,7 @@ import json
 import time
 import six
 
-#设置device 
+#设置device
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 trained_param = {} # 训练参数:dict
@@ -225,8 +225,8 @@ if __name__ == '__main__':
         net = torch.nn.DataParallel(net)
         cudnn.benchmark = True
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(net.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
-    server = initial_server('localhost', 7000)
+    optimizer = optim.SGD(net.parameters(), lr = 0.1, momentum=0.9, weight_decay=5e-4)
+    server = initial_server('localhost', 7001)
     # for i in range(2):
     while True:
         # step.1.2-train
@@ -260,10 +260,10 @@ if __name__ == '__main__':
         # 等待接受新的参数（client发送-server接受-server聚合-server发送-client接受）
         # server = initial_server('localhost', 7000)
         conn, addr = server.accept()  # 阻塞
-        print('receiving data...')
-        received_param = param_rec(conn=conn, addr=addr)
+        print('receiving data from server...')
+        received_param = param_rec(conn= conn, addr= addr)
         conn.close()
-        print('receive param:', len(received_param))
+        print('end receiving, receive param:', len(received_param))
 
         # step.8-更新参数，重新训练网络
         net = param_load(net, received_param)
